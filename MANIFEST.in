@@ -1,0 +1,2 @@
+include uwsgi-dogstatsd/plugin.c
+include uwsgi-dogstatsd/uwsgiplugin.py

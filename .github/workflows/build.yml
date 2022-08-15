@@ -1,0 +1,84 @@
+name: build
+on:
+  pull_request:
+  push:
+    branches: [main, test-me-*, release/**]
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+    - uses: actions/setup-python@v3
+      with:
+        python-version: 3.8
+
+    - run: |
+        set -euxo pipefail
+        python3 -um pip install build==0.8.0
+        python3 -um build
+        python3 -um pip install dist/*.whl ephemeral-port-reserve pytest pyuwsgi
+        python3 -um pytest -s tests
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: dist-macos
+        path: dist/*
+
+  linux:
+    runs-on: ubuntu-latest
+    container: ghcr.io/getsentry/pypi-manylinux-amd64-ci
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - run: |
+        set -euxo pipefail
+        apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libpcre3-dev
+        python3 -um pip install build==0.8.0
+        python3 -um build --outdir tmp
+        python3 -um auditwheel repair tmp/*.whl --wheel-dir dist
+        python3 -um pip install dist/*.whl ephemeral-port-reserve pytest pyuwsgi
+        python3 -um pytest -s tests
+      shell: bash
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: dist-linux
+        path: dist/*
+
+  cirrus:
+    strategy:
+      matrix:
+        task: [macos-arm64, linux-arm64]
+    runs-on: ubuntu-latest
+    permissions:
+      checks: read
+    steps:
+    - uses: getsentry/action-wait-for-cirrus@v1.0.0
+      with:
+        task: ${{ matrix.task }}
+        commit: ${{ github.event.pull_request.head.sha || github.sha }}
+      timeout-minutes: 60
+    - uses: actions/upload-artifact@v3
+      with:
+        name: dist-${{ matrix.task }}
+        path: dist/*
+
+  collect:
+    needs: [linux, macos, cirrus]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/download-artifact@v3
+      with:
+        path: tmpdist
+    - run: |
+        mkdir dist
+        find tmpdist -type f | xargs --replace mv {} dist
+    - uses: actions/upload-artifact@v3
+      with:
+        name: ${{ github.sha }}
+        path: dist/*

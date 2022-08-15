@@ -1,0 +1,2 @@
+[build-system]
+requires = ["pyuwsgi", "setuptools>=62.4", "wheel"]
