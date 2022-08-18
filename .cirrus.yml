@@ -1,0 +1,35 @@
+env:
+  CIRRUS_CLONE_SUBMODULES: true
+
+macos_task:
+  name: macos-arm64
+  macos_instance:
+    image: ghcr.io/cirruslabs/macos-monterey-base:latest
+  env:
+    PATH: ${CIRRUS_WORKING_DIR}/python-3.8.13+1-macosx_12_0_arm64/bin:${PATH}
+  setup_script:
+  - curl --location --silent --output python.tgz https://storage.googleapis.com/sentry-dev-infra-assets/prebuilt-pythons/python-3.8.13+1-macosx_12_0_arm64.tgz
+  - echo '0143c8d2db4922a24d03eb3f78948360a39f7d18a992e35706add90fffc00517  python.tgz' | shasum -a 256 --check -
+  - tar -xf python.tgz
+  - python3 -um ensurepip
+  script:
+  - python3 -um pip install build==0.8.0
+  - python3 -um build
+  - python3 -um pip install dist/*.whl ephemeral-port-reserve pytest pyuwsgi
+  - python3 -um pytest -s tests
+  artifacts:
+    path: dist/*
+
+linux_task:
+  name: linux-arm64
+  arm_container:
+    image: ghcr.io/getsentry/pypi-manylinux-arm64-ci
+  script:
+  - apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libpcre3-dev
+  - python3 -um pip install build==0.8.0
+  - python3 -um build --outdir tmp
+  - python3 -um auditwheel repair tmp/*.whl --wheel-dir dist
+  - python3 -um pip install dist/*.whl ephemeral-port-reserve pytest pyuwsgi
+  - python3 -um pytest -s tests
+  artifacts:
+    path: dist/*

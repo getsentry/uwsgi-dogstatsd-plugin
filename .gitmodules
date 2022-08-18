@@ -1,0 +1,3 @@
+[submodule "uwsgi-dogstatsd"]
+	path = uwsgi-dogstatsd
+	url = https://github.com/DataDog/uwsgi-dogstatsd
